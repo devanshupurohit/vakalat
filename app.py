@@ -128,7 +128,7 @@ def transcribe_and_analyze(audio_file, text_query, legal_category, uploaded_file
             logging.error("Failed to generate PDF report")
             chat_history.append({"role": "assistant", "content": "Error: Could not generate PDF report."})
 
-        audio_response = None
+        audio_response = speak_response(response)
         audio_button = gr.Button("Play Audio Response", visible=True)
 
         email_status = None
@@ -220,6 +220,7 @@ def handle_document_analysis(uploaded_files, legal_category, email_address=None)
         text_preview = "\n\n".join([f"Document {i+1}:\n{text[:500]}" for i, text in enumerate(extracted_texts)])
         text_preview = text_preview[:1000] + ("..." if len(text_preview) > 1000 else "")
 
+        audio_response = speak_response(response)
         audio_button = gr.Button("Play Audio Response", visible=True)
 
         email_status = None
@@ -228,13 +229,13 @@ def handle_document_analysis(uploaded_files, legal_category, email_address=None)
             email_status = send_email(email_address, "VAKALAT Document Analysis", email_body, pdf_report)
             chat_history.append({"role": "assistant", "content": email_status})
 
-        return chat_history, text_preview, legal_terms, sentiment, summary_file, pdf_report, audio_button, email_status
+        return chat_history, text_preview, legal_terms, sentiment, summary_file, pdf_report, audio_response, audio_button, email_status
 
     except Exception as e:
         logging.error(f"Error in handle_document_analysis: {e}")
         error_msg = f"Error analyzing documents: {str(e)}"
         chat_history.append({"role": "assistant", "content": error_msg})
-        return chat_history, error_msg, [], "No sentiment analysis available", None, None, None, None
+        return chat_history, error_msg, [], "No sentiment analysis available", None, None, None, None, None
 
 def play_document_analysis_audio(chat_history):
     if chat_history and isinstance(chat_history, list) and chat_history[-1].get("role") == "assistant":
@@ -269,6 +270,7 @@ def handle_mediation(parties, issue, desired_outcome, legal_category, email_addr
             logging.error("Failed to generate mediation agreement")
             chat_history.append({"role": "assistant", "content": "Error: Could not generate mediation agreement."})
 
+        audio_response = speak_response(response)
         audio_button = gr.Button("Play Audio Response", visible=True)
 
         email_status = None
@@ -277,13 +279,13 @@ def handle_mediation(parties, issue, desired_outcome, legal_category, email_addr
             email_status = send_email(email_address, "VAKALAT Mediation Agreement", email_body, agreement_file)
             chat_history.append({"role": "assistant", "content": email_status})
 
-        return chat_history, agreement_file, audio_button, email_status
+        return chat_history, agreement_file, audio_response, audio_button, email_status
 
     except Exception as e:
         logging.error(f"Error in handle_mediation: {e}")
         error_msg = f"Error processing mediation: {str(e)}"
         chat_history.append({"role": "assistant", "content": error_msg})
-        return chat_history, None, None, None
+        return chat_history, None, None, None, None
 
 def play_mediation_audio(chat_history):
     if chat_history and isinstance(chat_history, list) and chat_history[-1].get("role") == "assistant":
@@ -291,10 +293,10 @@ def play_mediation_audio(chat_history):
     return None
 
 def reset_document_analysis():
-    return [], "", [], "No sentiment analysis available", None, None, None, None
+    return [], "", [], "No sentiment analysis available", None, None, None, None, None
 
 def reset_mediation():
-    return [], None, None, None
+    return [], None, None, None, None
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("<h1 style='text-align: center;'>VAKALAT: Your Legal Assistant</h1>")
@@ -340,6 +342,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             sentiment = gr.Textbox(label="Document Sentiment")
             summary_file = gr.File(label="Download Summary (TXT)")
             doc_pdf_output = gr.File(label="Download Analysis Report (PDF)")
+            doc_audio_output = gr.Audio(label="Audio Response", type="filepath")
             doc_audio_button = gr.Button("Play Audio Response", visible=False)
             doc_email_status = gr.Textbox(label="Email Status", visible=False)
             
@@ -348,7 +351,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                 inputs=[doc_file_input, doc_legal_category, doc_email_input],
                 outputs=[
                     doc_chatbot, text_preview, legal_terms, sentiment,
-                    summary_file, doc_pdf_output, doc_audio_button, doc_email_status
+                    summary_file, doc_pdf_output, doc_audio_output, doc_audio_button, doc_email_status
                 ]
             )
             reset_button.click(
@@ -356,13 +359,13 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                 inputs=None,
                 outputs=[
                     doc_chatbot, text_preview, legal_terms, sentiment,
-                    summary_file, doc_pdf_output, doc_audio_button, doc_email_status
+                    summary_file, doc_pdf_output, doc_audio_output, doc_audio_button, doc_email_status
                 ]
             )
             doc_audio_button.click(
                 fn=play_document_analysis_audio,
                 inputs=[doc_chatbot],
-                outputs=[audio_output]
+                outputs=[doc_audio_output]
             )
 
         with gr.Tab("Mediation"):
@@ -375,23 +378,24 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
             reset_med_button = gr.Button("Reset Mediation")
             med_chatbot = gr.Chatbot(label="Mediation Analysis", type="messages")
             agreement_file = gr.File(label="Download Mediation Agreement (PDF)")
+            med_audio_output = gr.Audio(label="Audio Response", type="filepath")
             med_audio_button = gr.Button("Play Audio Response", visible=False)
             med_email_status = gr.Textbox(label="Email Status", visible=False)
             
             mediate_button.click(
                 fn=handle_mediation,
                 inputs=[parties_input, issue_input, outcome_input, med_legal_category, med_email_input],
-                outputs=[med_chatbot, agreement_file, med_audio_button, med_email_status]
+                outputs=[med_chatbot, agreement_file, med_audio_output, med_audio_button, med_email_status]
             )
             reset_med_button.click(
                 fn=reset_mediation,
                 inputs=None,
-                outputs=[med_chatbot, agreement_file, med_audio_button, med_email_status]
+                outputs=[med_chatbot, agreement_file, med_audio_output, med_audio_button, med_email_status]
             )
             med_audio_button.click(
                 fn=play_mediation_audio,
                 inputs=[med_chatbot],
-                outputs=[audio_output]
+                outputs=[med_audio_output]
             )
 
 if __name__ == "__main__":
